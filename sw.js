@@ -45,6 +45,17 @@ self.addEventListener('activate', (event) => {
 
 // 3. Smart Strategy: Network-First for HTML, Cache-First for static libraries
 self.addEventListener('fetch', (event) => {
+  // 1. Never cache non-GET requests (Cache API strictly rejects POST, PUT, PATCH, DELETE)
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
+  // 2. Bypass Supabase APIs and realtime websockets
+  const url = new URL(event.request.url);
+  if (url.hostname.includes('supabase.co')) {
+    return;
+  }
+
   const isHTML = event.request.mode === 'navigate' || event.request.destination === 'document';
 
   if (isHTML) {
