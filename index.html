@@ -1365,7 +1365,7 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
         document.body.classList.remove('dark');
       }
 
-      // 1. Offline fallback from local storage
+      // 1. Offline fallback
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved !== null) {
         try {
@@ -1399,32 +1399,36 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
             }
           }
         } catch (err) {
-          console.warn('Supabase fetch bypassed:', err);
+          console.warn('Cloud fetch bypassed:', err);
         }
       }
     }
 
     async function saveAppData() {
-      // Step 1: Instant local save
-      try {
+      // 1. HARD GUARD: Block pushing default or empty starter data to the cloud
+      if (!appData || !appData.subjects || appData.subjects.length < 3) {
+        console.warn('Sync Guard: Prevented blank/starter state from overwriting Supabase vault.');
         localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
-      } catch (err) {
-        console.error('LocalStorage quota exceeded or write failed', err);
-        appAlert('Storage Error', 'Local storage is full or disabled. Your latest changes could not be saved.');
+        return;
       }
 
-      // Step 2: Push changes to Supabase cloud
+      // 2. Persist locally
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+
+      // 3. Persist to cloud
       if (supabaseClient) {
         try {
-          await supabaseClient
+          const { error } = await supabaseClient
             .from('app_sync')
             .upsert({
               id: SYNC_ROOM_ID,
               data: appData,
               updated_at: new Date().toISOString()
             });
+
+          if (error) throw error;
         } catch (err) {
-          console.warn('Cloud sync push failed:', err);
+          console.warn('Cloud sync error:', err);
         }
       }
     }
@@ -3615,7 +3619,7 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
           .on('postgres_changes', { event: '*', schema: 'public', table: 'app_sync' }, payload => {
             if (payload.new && payload.new.data && payload.new.id === SYNC_ROOM_ID) {
               const incoming = sanitizeData(payload.new.data);
-              if (incoming && incoming.subjects && incoming.subjects.length > 0) {
+              if (incoming && incoming.subjects && incoming.subjects.length >= 3) {
                 appData = incoming;
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
                 renderNavigation();
