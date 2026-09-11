@@ -1020,6 +1020,34 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
     </div>
   </div>
 
+<!-- QUICK ACTION DECK PICKER MODAL -->
+  <div id="modal-deck-picker" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md hidden">
+    <div class="modal-panel onyx-panel w-full max-w-sm rounded-3xl p-6 space-y-4 shadow-2xl border border-white/80 dark:border-white/20" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between border-b border-[#B8DAFF]/40 dark:border-white/10 pb-2">
+        <h3 class="text-sm font-black text-neutral-900 dark:text-white flex items-center gap-2" id="deck-picker-title">
+          <i data-lucide="layers" class="w-4 h-4 text-blue-500"></i> Select Deck
+        </h3>
+        <button onclick="closeModal('modal-deck-picker')" class="p-1 rounded-lg hover:bg-white/60 dark:hover:bg-white/10 text-neutral-600 dark:text-neutral-300">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <p class="text-xs text-neutral-500 dark:text-neutral-400" id="deck-picker-description">
+        Choose which deck you want to study:
+      </p>
+
+      <div class="space-y-2 max-h-[50vh] overflow-y-auto pr-1" id="deck-picker-list">
+        <!-- Decks populated dynamically -->
+      </div>
+
+      <div class="flex justify-end pt-2 border-t border-[#B8DAFF]/30 dark:border-white/10">
+        <button onclick="closeModal('modal-deck-picker')" class="px-4 py-2 rounded-xl text-xs font-semibold bg-white/70 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- TOAST SHELF -->
   <div id="toast-shelf" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
@@ -3457,8 +3485,59 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
         await appAlert('No Decks Found', 'Please create a deck first.');
         return;
       }
-      if (type === 'flashcards') startFlashcards(appData.decks[0].id);
-      if (type === 'exam') promptPracticeExam(appData.decks[0].id);
+
+      // Prioritize decks matching current subject filter if one is selected
+      let availableDecks = [...appData.decks];
+      if (currentSubjectFilter !== 'All') {
+        const filtered = availableDecks.filter(d => String(d.subjectId) === String(currentSubjectFilter));
+        if (filtered.length > 0) availableDecks = filtered;
+      }
+
+      // If exactly 1 deck exists in current view, open it immediately
+      if (availableDecks.length === 1) {
+        const singleDeckId = availableDecks[0].id;
+        if (type === 'flashcards') startFlashcards(singleDeckId);
+        else promptPracticeExam(singleDeckId);
+        return;
+      }
+
+      // Otherwise, open the selection modal
+      const pickerTitle = document.getElementById('deck-picker-title');
+      pickerTitle.innerHTML = type === 'flashcards'
+        ? `<i data-lucide="layers" class="w-4 h-4 text-blue-500"></i> Study Flashcards`
+        : `<i data-lucide="clipboard-check" class="w-4 h-4 text-emerald-500"></i> Practice Exam`;
+
+      const listContainer = document.getElementById('deck-picker-list');
+      listContainer.innerHTML = availableDecks.map(deck => {
+        const cardCount = appData.cards.filter(c => String(c.deckId) === String(deck.id)).length;
+        const sub = appData.subjects.find(s => String(s.id) === String(deck.subjectId));
+        const subName = sub ? sub.name : 'General';
+
+        return `
+          <button onclick="selectQuickActionDeck('${escapeHTML(String(deck.id))}', '${type}')" class="w-full p-3 rounded-2xl bg-white/70 dark:bg-neutral-800/80 hover:bg-white dark:hover:bg-neutral-700/90 border border-[#B8DAFF]/40 dark:border-white/10 text-left transition flex items-center justify-between group">
+            <div class="truncate flex-1 pr-2">
+              <div class="flex items-center gap-1.5 mb-0.5">
+                <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300">${escapeHTML(deck.period)}</span>
+                <span class="text-[10px] font-semibold text-neutral-400 truncate">${escapeHTML(subName)}</span>
+              </div>
+              <h4 class="font-bold text-xs text-neutral-800 dark:text-white truncate">${escapeHTML(deck.title)}</h4>
+            </div>
+            <span class="text-[10px] font-bold text-neutral-400 font-mono shrink-0">${cardCount} cards</span>
+          </button>
+        `;
+      }).join('');
+
+      openModal('modal-deck-picker');
+      lucide.createIcons();
+    }
+
+    function selectQuickActionDeck(deckId, type) {
+      closeModal('modal-deck-picker');
+      if (type === 'flashcards') {
+        startFlashcards(deckId);
+      } else {
+        promptPracticeExam(deckId);
+      }
     }
 
     /* App Bootstrap */
