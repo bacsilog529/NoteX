@@ -26,6 +26,7 @@
   <script src="https://unpkg.com/lucide@0.400.0/dist/umd/lucide.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
     :root {
@@ -1192,6 +1193,17 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
     /* ==========================================================================
        DATA STORE: SAFE PERSISTENCE & TYPE SANITIZATION
        ========================================================================== */
+    
+    /* ==========================================================================
+       SUPABASE REALTIME CLOUD SYNC CONFIG
+       ========================================================================== */
+    const SUPABASE_URL = 'https://abuvtbvpdukpjzqnglpb.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFidXZ0YnZwZHVrcGp6cW5nbHBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NzMwNjYsImV4cCI6MjEwNDU0OTA2Nn0.54Vj24v-GEgDdYkPjVNqiM_KbQ3xoRoOcgS_Il4fC7M';
+    const SYNC_ROOM_ID = 'notex_vault_main';
+
+    const supabaseClient = (window.supabase && SUPABASE_ANON_KEY !== 'PASTE_YOUR_COPIED_ANON_KEY_HERE')
+      ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+      : null;
     const STORAGE_KEY = 'NoteX_StudySuite_Data_v3';
     const THEME_KEY = 'NoteX_Theme_Mode';
     const EXAM_PREFS_KEY = 'NoteX_Exam_Preferences';
@@ -1226,41 +1238,82 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
       return data;
     }
 
-    function loadAppData() {
-  const savedTheme = localStorage.getItem(THEME_KEY);
-  if (savedTheme === 'dark') {
-    document.body.classList.add('dark');
-  } else {
-    document.body.classList.remove('dark');
-  }
+    async function loadAppData() {
+      const savedTheme = localStorage.getItem(THEME_KEY);
+      if (savedTheme === 'dark') {
+        document.body.classList.add('dark');
+      } else {
+        document.body.classList.remove('dark');
+      }
 
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved !== null) {
-    try {
-      const parsed = JSON.parse(saved);
-      const sanitized = sanitizeData(parsed);
-      // Valid JSON exists: preserve user data even if subjects, decks, or cards are completely empty
-      if (sanitized) {
-        appData = sanitized;
+      // Step 1: Load instant offline cache from localStorage
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved !== null) {
+        try {
+          const parsed = JSON.parse(saved);
+          const sanitized = sanitizeData(parsed);
+          if (sanitized) appData = sanitized;
+          else initDefaultData();
+        } catch (e) {
+          initDefaultData();
+        }
       } else {
         initDefaultData();
       }
-    } catch (e) {
-      // Data is genuinely corrupted JSON
-      initDefaultData();
-    }
-  } else {
-    // First-time visit: seed default starter data
-    initDefaultData();
-  }
-}
 
-    function saveAppData() {
+      // Step 2: Fetch latest updates from Supabase cloud
+      if (supabaseClient) {
+        try {
+          const { data, error } = await supabaseClient
+            .from('app_sync')
+            .select('data')
+            .eq('id', SYNC_ROOM_ID)
+            .single();
+
+          if (data && data.data) {
+            const remoteSanitized = sanitizeData(data.data);
+            if (remoteSanitized) {
+              appData = remoteSanitized;
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+              renderNavigation();
+              if (currentActiveView === 'dashboard') renderDashboard();
+            }
+          } else {
+            // First time running with empty database: seed cloud with current data
+            await supabaseClient.from('app_sync').upsert({
+              id: SYNC_ROOM_ID,
+              data: appData,
+              updated_at: new Date().toISOString()
+            });
+          }
+        } catch (err) {
+          console.warn('Supabase cloud fetch bypassed, using local offline copy:', err);
+        }
+      }
+    }
+
+    async function saveAppData() {
+      // Step 1: Instant local save
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
       } catch (err) {
         console.error('LocalStorage quota exceeded or write failed', err);
         appAlert('Storage Error', 'Local storage is full or disabled. Your latest changes could not be saved.');
+      }
+
+      // Step 2: Push changes to Supabase cloud
+      if (supabaseClient) {
+        try {
+          await supabaseClient
+            .from('app_sync')
+            .upsert({
+              id: SYNC_ROOM_ID,
+              data: appData,
+              updated_at: new Date().toISOString()
+            });
+        } catch (err) {
+          console.warn('Cloud sync push failed:', err);
+        }
       }
     }
 
@@ -3372,6 +3425,25 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
       loadAppData();
       renderNavigation();
       renderDashboard();
+
+      // Listen for instant real-time sync events across devices
+      if (supabaseClient) {
+        supabaseClient
+          .channel('public:app_sync')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'app_sync' }, payload => {
+            if (payload.new && payload.new.data && payload.new.id === SYNC_ROOM_ID) {
+              const updatedData = sanitizeData(payload.new.data);
+              if (updatedData) {
+                appData = updatedData;
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+                renderNavigation();
+                if (currentActiveView === 'dashboard') renderDashboard();
+                showToast('Synced from another device');
+              }
+            }
+          })
+          .subscribe();
+      }
     });
   </script>
 </body>
