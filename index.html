@@ -1365,7 +1365,7 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
         document.body.classList.remove('dark');
       }
 
-      // 1. Offline fallback
+      // 1. Offline local storage fallback
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved !== null) {
         try {
@@ -1380,7 +1380,7 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
         initDefaultData();
       }
 
-      // 2. Remote Cloud Fetch (Strictly READ-ONLY - Never write default templates back to cloud)
+      // 2. Cloud Fetch (Strictly READ-ONLY — never overwrites Supabase on startup)
       if (supabaseClient) {
         try {
           const { data, error } = await supabaseClient
@@ -1399,7 +1399,7 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
             }
           }
         } catch (err) {
-          console.warn('Supabase fetch bypassed:', err);
+          console.warn('Cloud fetch bypassed:', err);
         }
       }
     }
