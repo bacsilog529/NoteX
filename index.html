@@ -1365,7 +1365,7 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
         document.body.classList.remove('dark');
       }
 
-      // Step 1: Offline fallback from localStorage
+      // 1. Offline fallback
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved !== null) {
         try {
@@ -1380,7 +1380,7 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
         initDefaultData();
       }
 
-      // Step 2: Fetch remote vault data safely
+      // 2. Remote Cloud Fetch (Strictly READ-ONLY - Never write default templates back to cloud)
       if (supabaseClient) {
         try {
           const { data, error } = await supabaseClient
@@ -1399,7 +1399,7 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
             }
           }
         } catch (err) {
-          console.warn('Supabase cloud fetch bypassed, using local copy:', err);
+          console.warn('Supabase fetch bypassed:', err);
         }
       }
     }
@@ -3603,30 +3603,22 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
       initPWA();
       initWebGL();
       renderWebGL(0);
-
-      // 1. Explicitly await cloud data before rendering the dashboard
+      
       await loadAppData();
       renderNavigation();
       renderDashboard();
 
-      // 2. Real-time listener for incoming updates
       if (supabaseClient) {
         supabaseClient
           .channel('public:app_sync')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'app_sync' }, payload => {
             if (payload.new && payload.new.data && payload.new.id === SYNC_ROOM_ID) {
               const incoming = sanitizeData(payload.new.data);
-              if (incoming) {
-                const currentTotal = (appData.subjects?.length || 0) + (appData.decks?.length || 0) + (appData.cards?.length || 0);
-                const incomingTotal = (incoming.subjects?.length || 0) + (incoming.decks?.length || 0) + (incoming.cards?.length || 0);
-
-                if (incomingTotal >= currentTotal) {
-                  appData = incoming;
-                  localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
-                  renderNavigation();
-                  if (currentActiveView === 'dashboard') renderDashboard();
-                  showToast('Synced from another device');
-                }
+              if (incoming && incoming.subjects && incoming.subjects.length > 0) {
+                appData = incoming;
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+                renderNavigation();
+                if (currentActiveView === 'dashboard') renderDashboard();
               }
             }
           })
