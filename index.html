@@ -584,6 +584,71 @@ body:not(.dark) #import-preview-box label {
     ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.4); border-radius: 9999px; }
     ::-webkit-scrollbar-track { background: transparent; }
+
+/* ==========================================================================
+   DECK PICKER MODAL CONTRAST FIXES
+   ========================================================================== */
+/* Light Mode styling */
+body:not(.dark) #modal-deck-picker .modal-panel {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+}
+
+body:not(.dark) #deck-picker-list button {
+  background-color: #F8FAFC !important;
+  border-color: #E2E8F0 !important;
+}
+
+body:not(.dark) #deck-picker-list button:hover {
+  background-color: #EFF6FF !important;
+  border-color: #BFDBFE !important;
+  transform: translateY(-1px);
+}
+
+body:not(.dark) #deck-picker-list h4 {
+  color: #0F172A !important;
+}
+
+body:not(.dark) #deck-picker-list .deck-picker-subname {
+  color: #64748B !important;
+}
+
+body:not(.dark) #deck-picker-list .deck-picker-count {
+  color: #0D82FF !important;
+  background-color: #EFF6FF !important;
+  border: 1px solid #DBEAFE !important;
+}
+
+/* Dark Mode styling */
+body.dark #modal-deck-picker .modal-panel {
+  background-color: rgba(15, 23, 42, 0.95) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+body.dark #deck-picker-list button {
+  background-color: rgba(30, 41, 59, 0.7) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+body.dark #deck-picker-list button:hover {
+  background-color: rgba(51, 65, 85, 0.8) !important;
+  border-color: rgba(13, 130, 255, 0.4) !important;
+}
+
+body.dark #deck-picker-list h4 {
+  color: #F8FAFC !important;
+}
+
+body.dark #deck-picker-list .deck-picker-subname {
+  color: #94A3B8 !important;
+}
+
+body.dark #deck-picker-list .deck-picker-count {
+  color: #93C5FD !important;
+  background-color: rgba(13, 130, 255, 0.15) !important;
+  border: 1px solid rgba(13, 130, 255, 0.25) !important;
+}
+
   </style>
 </head>
 
@@ -3514,15 +3579,15 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
         const subName = sub ? sub.name : 'General';
 
         return `
-          <button onclick="selectQuickActionDeck('${escapeHTML(String(deck.id))}', '${type}')" class="w-full p-3 rounded-2xl bg-white/70 dark:bg-neutral-800/80 hover:bg-white dark:hover:bg-neutral-700/90 border border-[#B8DAFF]/40 dark:border-white/10 text-left transition flex items-center justify-between group">
-            <div class="truncate flex-1 pr-2">
-              <div class="flex items-center gap-1.5 mb-0.5">
-                <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300">${escapeHTML(deck.period)}</span>
-                <span class="text-[10px] font-semibold text-neutral-400 truncate">${escapeHTML(subName)}</span>
+          <button onclick="selectQuickActionDeck('${escapeHTML(String(deck.id))}', '${type}')" class="w-full p-3.5 rounded-2xl border text-left transition-all duration-150 flex items-center justify-between group shadow-sm">
+            <div class="truncate flex-1 pr-3">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-[#0D82FF]/10 text-[#0D82FF] dark:text-[#389BFF] font-mono">${escapeHTML(deck.period)}</span>
+                <span class="text-[11px] font-semibold deck-picker-subname truncate">${escapeHTML(subName)}</span>
               </div>
-              <h4 class="font-bold text-xs text-neutral-800 dark:text-white truncate">${escapeHTML(deck.title)}</h4>
+              <h4 class="font-bold text-xs truncate leading-tight">${escapeHTML(deck.title)}</h4>
             </div>
-            <span class="text-[10px] font-bold text-neutral-400 font-mono shrink-0">${cardCount} cards</span>
+            <span class="text-[10px] font-bold font-mono px-2.5 py-1 rounded-xl shrink-0 deck-picker-count">${cardCount} cards</span>
           </button>
         `;
       }).join('');
