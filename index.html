@@ -1365,7 +1365,7 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
         document.body.classList.remove('dark');
       }
 
-      // Step 1: Load instant offline cache from localStorage
+      // Step 1: Offline fallback from localStorage
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved !== null) {
         try {
@@ -1380,33 +1380,26 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
         initDefaultData();
       }
 
-      // Step 2: Fetch latest updates from Supabase cloud
+      // Step 2: Fetch remote vault data safely
       if (supabaseClient) {
         try {
           const { data, error } = await supabaseClient
             .from('app_sync')
             .select('data')
             .eq('id', SYNC_ROOM_ID)
-            .single();
+            .maybeSingle();
 
           if (data && data.data) {
             const remoteSanitized = sanitizeData(data.data);
-            if (remoteSanitized) {
+            if (remoteSanitized && remoteSanitized.subjects && remoteSanitized.subjects.length > 0) {
               appData = remoteSanitized;
               localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
               renderNavigation();
               if (currentActiveView === 'dashboard') renderDashboard();
             }
-          } else {
-            // First time running with empty database: seed cloud with current data
-            await supabaseClient.from('app_sync').upsert({
-              id: SYNC_ROOM_ID,
-              data: appData,
-              updated_at: new Date().toISOString()
-            });
           }
         } catch (err) {
-          console.warn('Supabase cloud fetch bypassed, using local offline copy:', err);
+          console.warn('Supabase cloud fetch bypassed, using local copy:', err);
         }
       }
     }
