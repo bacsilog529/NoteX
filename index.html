@@ -278,6 +278,32 @@ body:not(.dark) td {
       border: 1px solid rgba(16, 185, 129, 0.3) !important;
     }
 
+/* Ensure high-contrast readability in Light Mode for Smart Importer */
+body:not(.dark) #modal-importer .modal-panel {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+}
+
+body:not(.dark) #import-target-deck,
+body:not(.dark) #import-textarea,
+body:not(.dark) #manual-prompt,
+body:not(.dark) #manual-answer,
+body:not(.dark) #import-preview-box input,
+body:not(.dark) #import-preview-box select {
+  background-color: #F8FAFC !important;
+  color: #0F172A !important;
+  border-color: #CBD5E1 !important;
+}
+
+body:not(.dark) #import-preview-box > div {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+}
+
+body:not(.dark) #import-preview-box label {
+  color: #64748B !important;
+}
+    
 /* ==========================================================================
        DARK MODE CONTRAST & BADGE CORRECTIONS
        ========================================================================== */
@@ -1748,10 +1774,16 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
       if (name) {
         const palette = ['#0D82FF', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4'];
         const randomColor = palette[appData.subjects.length % palette.length];
-        appData.subjects.push({ id: generateId(), name, color: randomColor });
-        saveAppData();
+        const newSub = { id: generateId(), name, color: randomColor };
+        appData.subjects.push(newSub);
+        
+        await saveAppData();
+        currentSubjectFilter = String(newSub.id);
+        const breadcrumb = document.getElementById('breadcrumb-subject');
+        if (breadcrumb) breadcrumb.innerText = name;
         renderNavigation();
         renderDashboard();
+        showToast(`Subject "${name}" created`);
       }
     }
 
@@ -2077,7 +2109,7 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
       lucide.createIcons();
     }
 
-    function saveDeckForm() {
+    async function saveDeckForm() {
       const editId = document.getElementById('deck-edit-mode-id').value;
       const title = document.getElementById('deck-title-field').value.trim();
       const subjectId = document.getElementById('deck-subject-field').value;
@@ -2094,18 +2126,30 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
           showToast(`Deck "${title}" updated`);
         }
       } else {
-        appData.decks.push({
+        const newDeck = {
           id: generateId(),
           title,
           subjectId: String(subjectId),
           period,
           lastStudied: new Date().toISOString()
-        });
+        };
+        appData.decks.push(newDeck);
         showToast(`Deck "${title}" created`);
       }
 
-      saveAppData();
+      await saveAppData();
       closeModal('modal-deck');
+
+      // Align dashboard filters so the new deck is immediately visible
+      currentSubjectFilter = String(subjectId);
+      currentPeriodFilter = 'All';
+      
+      const sub = appData.subjects.find(s => String(s.id) === String(subjectId));
+      if (sub) {
+        document.getElementById('breadcrumb-subject').innerText = sub.name;
+      }
+      setPeriodFilter('All');
+      renderNavigation();
       renderDashboard();
     }
 
@@ -3427,18 +3471,25 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
       renderDashboard();
 
       // Listen for instant real-time sync events across devices
+
       if (supabaseClient) {
         supabaseClient
           .channel('public:app_sync')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'app_sync' }, payload => {
             if (payload.new && payload.new.data && payload.new.id === SYNC_ROOM_ID) {
-              const updatedData = sanitizeData(payload.new.data);
-              if (updatedData) {
-                appData = updatedData;
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
-                renderNavigation();
-                if (currentActiveView === 'dashboard') renderDashboard();
-                showToast('Synced from another device');
+              const incoming = sanitizeData(payload.new.data);
+              if (incoming) {
+                const currentTotal = (appData.subjects?.length || 0) + (appData.decks?.length || 0) + (appData.cards?.length || 0);
+                const incomingTotal = (incoming.subjects?.length || 0) + (incoming.decks?.length || 0) + (incoming.cards?.length || 0);
+
+                // Prevent a stale device with fewer items from deleting newly created data
+                if (incomingTotal >= currentTotal) {
+                  appData = incoming;
+                  localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+                  renderNavigation();
+                  if (currentActiveView === 'dashboard') renderDashboard();
+                  showToast('Synced from another device');
+                }
               }
             }
           })
