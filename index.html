@@ -3599,16 +3599,17 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
     }
 
     /* App Bootstrap */
-    window.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('DOMContentLoaded', async () => {
       initPWA();
       initWebGL();
       renderWebGL(0);
-      loadAppData();
+      
+      // Await the remote cloud fetch BEFORE initial render
+      await loadAppData();
       renderNavigation();
       renderDashboard();
 
       // Listen for instant real-time sync events across devices
-
       if (supabaseClient) {
         supabaseClient
           .channel('public:app_sync')
@@ -3619,7 +3620,6 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
                 const currentTotal = (appData.subjects?.length || 0) + (appData.decks?.length || 0) + (appData.cards?.length || 0);
                 const incomingTotal = (incoming.subjects?.length || 0) + (incoming.decks?.length || 0) + (incoming.cards?.length || 0);
 
-                // Prevent a stale device with fewer items from deleting newly created data
                 if (incomingTotal >= currentTotal) {
                   appData = incoming;
                   localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
@@ -3633,6 +3633,7 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
           .subscribe();
       }
     });
+    
   </script>
 </body>
 </html>
