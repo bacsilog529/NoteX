@@ -3598,18 +3598,18 @@ c. Bus" class="w-full flex-1 p-3 rounded-2xl text-xs leading-relaxed bg-white/60
       }
     }
 
-    /* App Bootstrap */
+/* App Bootstrap */
     window.addEventListener('DOMContentLoaded', async () => {
       initPWA();
       initWebGL();
       renderWebGL(0);
-      
-      // Await the remote cloud fetch BEFORE initial render
+
+      // 1. Explicitly await cloud data before rendering the dashboard
       await loadAppData();
       renderNavigation();
       renderDashboard();
 
-      // Listen for instant real-time sync events across devices
+      // 2. Real-time listener for incoming updates
       if (supabaseClient) {
         supabaseClient
           .channel('public:app_sync')
